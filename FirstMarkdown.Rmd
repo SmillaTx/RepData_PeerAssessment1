@@ -1,0 +1,144 @@
+---
+title: "Peer Assignment - Reproducible Research"
+author: "Smilla Tx"
+date: "7 3 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(lattice)
+```
+
+## Loading and preprocessing the data 
+
+```{r}
+data <- read.csv(file.choose())
+```
+
+## What is the mean total number of steps taken per day? 
+
+The data includes missing values (NA), therefore these need to be defined
+
+```{r}
+data_use <- data[!is.na(data[1]),]
+#data_use$interval <- strptime(gsub("([0-9]{1,2})([0-9]{2})", "\\1:\\2", data_use$interval), format='%H:%M'
+```
+
+In order to calculate the total number of steps:
+```{r}
+
+stepsByDay <- tapply(data_use$steps, data_use$date, sum, na.rm=TRUE)
+
+```
+
+This histogram shows the number of steps per day: 
+
+```{r echo=FALSE}
+qplot(stepsByDay, xlab='Total steps per day', ylab='Frequency using binwith 500', binwidth=500)
+```
+
+Now we calculate the mean and median of the total number we already calculated: 
+
+```{r}
+mean_steps <- mean(stepsByDay$steps)
+median_steps <- median(stepsByDay$steps)
+```
+
+** The mean of total steps per day is 10766.19 and the median is 10765. **
+
+## What is the average daily activity pattern?
+
+First we calculate the average number of steps per interval:
+
+```{r}
+average_steps_per_interval_data_use <- get_steps_per_interval(data_use)
+```
+
+This histogram shows the number of steps per interval:
+
+```{r echo=FALSE}
+plot(average_steps_per_interval_data_use$interval, average_steps_per_interval_data_use$steps, type = "l", xlab = "interval", ylab = "average steps")
+```
+
+To get a better overview of the data, we calculate the interval with the highest step rate:
+
+```{r}
+max_steps <-  average_steps_per_interval_data_use$steps ==
+            max(average_steps_per_interval_data_use$steps)
+
+max_per_interval <- average_steps_per_interval_data_use[max_steps,]
+interval_max <- max_per_interval$interval
+```
+
+** The interval with the highest average step rate was 835.**
+
+## Imputing missing values
+
+First we calculate the number of missing values in the dataset:
+
+```{r}
+missing_values <- sum(is.na(data$steps))
+```
+
+Now the missing values will be replaced with the prior calculated average steps per interval:
+
+```{r}
+fill_data <- data
+na_indices <- which(is.na(fill_data$steps))
+ave_steps <- average_steps_per_interval_data_use 
+
+   for(i in na_indices) {
+     interval <- fill_data$interval[i]
+     fill_data$steps[i] <- ave_steps[ave_steps$interval ==interval,]$steps
+   }
+```
+
+Now this new data can be found in the fill_data set. 
+Now we created a histogram to look at the data:
+
+```{r echo=FALSE}
+ggplot(total_steps_per_day_fill_data, aes(x = day, y = steps)) 
+    geom_bar(stat = "identity") 
+    ylab("total steps")
+```
+
+We repeat the step from above with the new data set to calculate the mean and median:
+
+```{r}
+mean_fill<- mean(total_steps_per_day_fill_data$steps)
+median_fill <- median(total_steps_per_day_fill_data$steps)
+```
+
+** Both the median and the mean have the value 10766.19.**
+
+## Are there differences in the activity patters between weekdays and weekends?
+
+First we add a factor to the data to see when was a weekday and when weekend.
+
+```{r}
+weekdays_list <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
+fill_data$day_of_week <- weekdays(fill_data$date)
+fill_data$type_of_day <-
+  factor(fill_data$day_of_week %in% weekdays_list,
+         levels = c(FALSE, TRUE),
+         labels = c("weekend", "weekday"))
+```
+
+We now want to look at the differences with a plot:
+
+```{r}
+weekday_data <- fill_data[fill_data$type_of_day == "weekday",]
+weekend_data <- fill_data[fill_data$type_of_day == "weekend",]
+weekday_steps <- get_steps_per_interval(weekday_data)
+weekend_steps <- get_steps_per_interval(weekend_data)
+```
+```{r echo=FALSE}
+weekday_steps$type_of_day <- factor(TRUE, levels = c(FALSE, TRUE), labels = c("weekend", "weekday"))
+weekend_steps$type_of_day <- factor(FALSE, levels = c(FALSE, TRUE), labels = c("weekend", "weekday"))
+weekday_weekend_steps <- rbind(weekday_steps, weekend_steps)
+xyplot(steps ~ interval | type_of_day, data = weekday_weekend_steps, layout = c(1,2), type = "l", xlab = "Interval", ylab = "Number of steps")
+```
+
+
